@@ -1,0 +1,11 @@
+#Start Aerospike server
+---
+
+
+- name: Start Aerospike server in nodes
+  hosts: "{{host}}"
+  remote_user: "{{user}}"
+  sudo: yes
+  tasks:
+        - name: start server
+          shell: sudo service aerospike start

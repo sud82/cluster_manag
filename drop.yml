@@ -1,0 +1,19 @@
+# MOdifie iptables, tc and add rule
+# for droping packets
+
+- name: Drop all packets comming from given host
+  hosts: '{{host}}'
+  vars:
+        src_ip: '{{src}}'
+  remote_user: '{{user}}'
+  sudo: yes
+  tasks:
+        - name: Drop All packets
+          shell: sudo iptables -A INPUT -s {{src_ip}} -j DROP
+          when: prob is not defined 
+
+        - name: Drop per of traffic
+          shell: sudo iptables -A INPUT  -m statistic --mode random --probability {{prob}} -s {{src_ip}} -j DROP
+          when: prob is defined
+
+

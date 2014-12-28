@@ -1,0 +1,14 @@
+# Drop percentage of traffic from a node
+
+- name: Drop a percentage of traffic from one node in cluster
+  hosts: '{{host}}'
+  remote_user: '{{user}}'
+  sudo: yes
+  tasks:
+        - name: Drop all traffic for specific protocol
+          command: sudo iptables -A INPUT -p {{proto}} -s {{src}} -j DROP
+          when: prob is not defined
+
+        - name: Drop percentage of traffic for specific protocol
+          command: sudo iptables -A INPUT -p {{proto}} -m statistic --mode random --probability {{prob}} -s {{src}} -j DROP 
+          when: prob is defined

@@ -1,0 +1,9 @@
+#Stop Aerospike server on host
+
+- name: Stop Aerospike server
+  hosts: '{{host}}'
+  remote_user: '{{user}}'
+  sudo: yes
+  tasks:
+        - name: Stop server
+          shell: sudo service aerospike stop

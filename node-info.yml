@@ -1,0 +1,20 @@
+# Check the status of node
+
+- name: Collect info about node
+  hosts: '{{host}}'
+  remote_user: '{{user}}'
+  sudo: true
+  tasks:
+
+        - name: Get Node filter rule
+          command: sudo iptables -L INPUT
+          register: result
+        - name: Printing Node filter rule
+          debug: var=result.stdout
+
+        - name: Get Node asd status
+          command:  sudo service aerospike status
+          register: result
+        - name: Printing Node asd status
+          debug: var=result.stdout
+
