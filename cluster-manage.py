@@ -28,10 +28,7 @@ except:
         print "citrusleaf.py not in your python path. Set PYTHONPATH!"
         sys.exit(-1)
 
-global arg_machines 
-global arg_port 
-arg_port =  3000
-arg_machines = ['127.0.0.1:' + str(arg_port)]
+
 
 def node_asd_info(host, port):
 	user = None
@@ -175,6 +172,8 @@ class RunCommand(cmd.Cmd):
         intro = bold + name + ", version " + _VERSION_ + reset
         def __init__(self):
                 cmd.Cmd.__init__(self)
+                #parse_config(hosts_from_parm)
+
 		#cluster = citrusleaf.CitrusleafCluster()
 		#t1 = '192.168.113.203'
 		#cluster = citrusleaf.getCluster_byhost(t1, 3000)
@@ -211,6 +210,10 @@ class RunCommand(cmd.Cmd):
                                         '\n\t [-p <protocol, default all>' + \
                                         '\n\t [-d <drop probability of traffic >]',
                                 'desc' : 'Remove filter in host for source '},
+		'connect_tocluster': {'usage' : bold + 'connect_tocluster' + reset +\
+						'\n\t[-h <Seed host ip to connect cluster eg:x.x.x.x >]'+ \
+						'\n\t[-p <port >]',
+					'desc': 'To connect with a new cluster enter host ip'},
 
  		}
 
@@ -336,7 +339,6 @@ class RunCommand(cmd.Cmd):
                         if(len(hlist) > 1):
                                 print self.help['stat']['usage']
                                 return False
-			print hlist[0]
 			hostport = []
 			hostport = hlist[0].split(':')
 			# If port is not given with host then take default port 3000
@@ -352,11 +354,49 @@ class RunCommand(cmd.Cmd):
                         print self.help['clusterStat']['usage']
                         return False
 
-		else:
-			try:
-				cluster_stat(host, port)
-			except:
-				print 'Node info failed'
+		try:
+			cluster_stat(host, port)
+		except:
+			print 'Node info failed'
+
+	def do_connect_tocluster(self, line):
+		print '\n\n************* connect to cluster ***************\n\n'
+		host = None
+		port = None
+
+		try:
+			opts,args = self._getargs(line,'h:p:')
+                        for o,a in opts:
+                                if o == '-h':
+                                        host = a
+				if o == '-p':
+					port = a
+			if host is None:
+				print self.help['connect_tocluster']['usage']
+				return False
+			else:
+				hp = host.split(':')
+				
+				h = hp[0]
+				if(len(hp) == 2 and port is None):
+					h,p = host.split(':')
+					port = p
+				if(len(hp) < 2 and port is None):
+					port = arg_port
+				#connect with cluster at seed (h:p)
+				try:
+					cluster_stat(h,port)
+					global arg_machines 
+					arg_machines = [h + ':' +str(port)]
+					
+				except:
+					print "Exception occured..can not connect to cluster"
+		
+                except (KeyboardInterrupt, SystemExit):
+                        raise
+                except:
+                        print self.help['connect_tocluster']['usage']
+                        return False			
 
 	def do_nodeInfo(self, line):
 		'Info about given list of host'
@@ -447,7 +487,7 @@ class RunCommand(cmd.Cmd):
                 except:
                         print self.help['remove_filter']['usage']
                         return False
-                hostport = arg_machine
+                hostport = arg_machines
                 srcport = None
                 proto = None
                 prob = 0
@@ -506,10 +546,10 @@ class RunCommand(cmd.Cmd):
 
 
 parser = argparse.ArgumentParser(add_help=False, conflict_handler='resolve')
-#parser.add_argument("-h", "--Host", default="127.0.0.1", help="Connection info of the host(s). Must be in the 127.0.0.1 or 127.0.0.1:3000 format. Comma separated for multi hosts")
-#parser.add_argument("-p", "--Port", type=int, default=3000, help="server port (default: %(default)s)")
-#parser.add_argument("-U", "--User", help="user name")
-#parser.add_argument("-P", "--Password", nargs="?", const="prompt", help="password")
+parser.add_argument("-h", "--Host", default="127.0.0.1", help="Connection info of the host(s). Must be in the 127.0.0.1 or 127.0.0.1:3000 format. Comma separated for multi hosts")
+parser.add_argument("-p", "--Port", type=int, default=3000, help="server port (default: %(default)s)")
+parser.add_argument("-U", "--User", help="user name")
+parser.add_argument("-P", "--Password", nargs="?", const="prompt", help="password")
 #parser.add_argument("-c", "--Config", default="filename", help="Location of configuration file (default: %(default)s)")
 parser.add_argument("-r", "--OneCommand", help="Deprecated. use -e instead.")
 parser.add_argument("-e", "--OneCommand", help="eg1: '-e info' execute the info command in the shell. eg2: '-e help' show the shell help text")
@@ -518,6 +558,62 @@ parser.add_argument("-e", "--OneCommand", help="eg1: '-e info' execute the info 
 parser.add_argument("-u", "--Usage", action="store_true", help="show program usage")
 args = parser.parse_args()
 
+global arg_machines
+global arg_port
+arg_port = 3000
+
+if args.Usage:
+        printusage(args.Config)
+        sys.exit(0)
+
+user = None
+password = None
+
+if args.User != None:
+        user = args.User
+        if args.Password == "prompt":
+                args.Password = getpass.getpass("Enter Password:")
+        password = citrusleaf.hashpassword(args.Password)
+
+if sys.stdout.isatty():
+        print "\nEnter help for commands\n"
+
+hosts_from_parm = []
+raw_hosts = []
+COLORS = [
+        'GREY', 'RED', 'GREEN', 'YELLOW',
+        'BLUE', 'MAGENTA', 'CYAN', 'WHITE', 'BLACK'
+]
+
+# netstopwatch to measure network performance
+g_want_netstopwatch = False
+g_netstopwatch_log_fd = None
+
+if args.Host != None:
+        raw_hosts = filter(None, args.Host.split(','))
+        if len(raw_hosts) < 1:
+                print "Host info is malformed. It must be comma separated, and in the format of 127.0.0.1 or 127.0.0.1:3000"
+                printusage(args.Config)
+                sys.exit(-1)
+elif args.Port != None:
+        hosts_from_parm.append('127.0.0.1:' + str(args.Port))
+
+# attach the port number to hosts if needed
+for hp in raw_hosts:
+        # look for the : to assume the port. If not there, add it
+        try:
+                h, p = hp.split(':')
+                hosts_from_parm.append(hp)
+        except Exception, ex:
+                hosts_from_parm.append(hp + ':' + str(args.Port))
+
+# Print Cluster stat
+for host in hosts_from_parm:
+	arg_machines = [host]
+	print "Overridden host ",host
+print"Trying to connect....", host
+h,p = arg_machines[0].split(':')
+cluster_stat(h,p)
 
 def main():
 			if args.OneCommand:
