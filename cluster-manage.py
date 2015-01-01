@@ -44,23 +44,34 @@ def node_asd_info(host, port):
 		print 'citrusleaf function failed..\n'
 	return node_id, serv, serv_alu
 
-def cluster_stat(host, port):
+def cluster_stat(cluster):
+	
 	try:
-		node_id, serv, serv_alu = node_asd_info(host, port)
+		cluster.getConnection()
+		if len(cluster.hosts_good) > 0:
+			host = cluster.hosts_good[0]
+			host_addr =  host.sockaddr[0][0]
+			port_addr = host.sockaddr[0][1]
+			print host_addr,port_addr
+	except:
+		print 'Exception: Can not connect to cluster'
+		return False
+	try:
+		node_id, serv, serv_alu = node_asd_info(host_addr, port_addr)
 	except:
 		print 'Exception in cluster-state'
 		return
 	if node_id == -1:
-        	print "request to ",host,":",port," returned error"
+        	print "request to ",host_addr,":",port_addr," returned error"
 		print host, "-----Node down"
         	return
 
 	if node_id == None:
-        	print "request to ",host,":",port," returned no data"
+        	print "request to ",host_addr,":",port_addr," returned no data"
         	return
 	services = serv.split(';')
 	services_alumni = serv_alu.split(';')
-	print host + '-----Node up'
+	print host_addr + '-----Node up'
 
 	print "\nService nodes"
 	for service in services:
@@ -355,7 +366,11 @@ class RunCommand(cmd.Cmd):
                         return False
 
 		try:
-			cluster_stat(host, port)
+			cluster = citrusleaf.CitrusleafCluster()
+			cluster =  citrusleaf.getCluster_byhost(host, port)
+			#cluster.crawler_debug = True
+			cluster_stat(cluster)
+
 		except:
 			print 'Node info failed'
 
@@ -385,7 +400,10 @@ class RunCommand(cmd.Cmd):
 					port = arg_port
 				#connect with cluster at seed (h:p)
 				try:
-					cluster_stat(h,port)
+					cluster = citrusleaf.CitrusleafCluster()
+					cluster =  citrusleaf.getCluster_byhost( h, port)
+					#cluster.crawler_debug = True
+					cluster_stat(cluster)
 					global arg_machines 
 					arg_machines = [h + ':' +str(port)]
 					
@@ -580,14 +598,7 @@ if sys.stdout.isatty():
 
 hosts_from_parm = []
 raw_hosts = []
-COLORS = [
-        'GREY', 'RED', 'GREEN', 'YELLOW',
-        'BLUE', 'MAGENTA', 'CYAN', 'WHITE', 'BLACK'
-]
 
-# netstopwatch to measure network performance
-g_want_netstopwatch = False
-g_netstopwatch_log_fd = None
 
 if args.Host != None:
         raw_hosts = filter(None, args.Host.split(','))
@@ -613,7 +624,10 @@ for host in hosts_from_parm:
 	print "Overridden host ",host
 print"Trying to connect....", host
 h,p = arg_machines[0].split(':')
-cluster_stat(h,p)
+cluster = citrusleaf.CitrusleafCluster() 
+cluster =  citrusleaf.getCluster_byhost( h,p )
+#cluster.crawler_debug = True
+cluster_stat(cluster)
 
 def main():
 			if args.OneCommand:
